@@ -1,0 +1,12 @@
+{
+    "name": "CI Build Report",
+    "className": "CustomApp",
+    "sdk": "2.0p",
+    "javascript": [
+    	"BuildDialog.js",
+        "App.js"
+    ],
+    "css": [
+        "app.css"
+    ]
+}
