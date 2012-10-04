@@ -14,7 +14,19 @@ Ext.define('CustomApp', {
                 items: [ { xtype: 'container', itemId: 'message_box', width: 200 }, 
                          { xtype: 'container', itemId: 'button_box', width: 200 },
                          { xtype: 'container', itemId: 'interface_box', cls: "box"},
-                         { xtype: 'container', itemId: 'build_results'},
+                         {
+                            xtype: 'container',
+                            itemId: 'build_summary',
+                            layout: {
+                                type: 'hbox',
+                                align: 'stretch'
+                            },
+                            margin: 4,
+                            items: [
+                                {xtype: 'container', itemId: 'build_results'},
+                                {xtype: 'container', itemId: 'test_result_chart'}
+                            ]
+                         },
                          { 
                              xtype: 'container',
                              flex: 1,
@@ -74,7 +86,7 @@ Ext.define('CustomApp', {
               }],
             listeners: {
                 load: function(store, data){
-                    console.log(data);
+                    //console.log(data);
                     this._buildResults(data[0].data);
                     this._testResults( data[0].data.Number);
                     this._saySomething("" );
@@ -91,7 +103,7 @@ Ext.define('CustomApp', {
                                         buildChosen: {
                                             scope: this,
                                             fn: function( settings ) {
-                                                console.log( "buildChosen:", settings.build );
+                                                //console.log( "buildChosen:", settings.build );
                                                 if ( settings.build && settings.build !== null ) {
                                                     // TODO: is there an easier way to get the grandparent?   
                                                     this.ownerCt.ownerCt.ownerCt._buildResults(settings.build);
@@ -112,7 +124,7 @@ Ext.define('CustomApp', {
         });
     },
     _onChangeSetsLoaded: function(changesets){
-            console.log("_onChangeSetsLoaded: ", changesets);    
+            //console.log("_onChangeSetsLoaded: ", changesets);    
             var cs_records = [];  
             
             Ext.Array.each(changesets, function(record) { 
@@ -197,15 +209,15 @@ Ext.define('CustomApp', {
     
     _changeSets: function(build){        
         if(build.Changesets !== null){
-            console.log('changesets:', build.Changesets);
+            //console.log('changesets:', build.Changesets);
             this._onChangeSetsLoaded( build.Changesets );
         }else{
-            console.log("No changesets for build");
+            //console.log("No changesets for build");
         }
     },
     
     _buildResults: function(build){
-        console.log(build);
+        //console.log(build);
         var t = new Ext.Template('<b>Build Number:</b> {Number} <br/>' +
                                  '<b>Build Status:</b> {Status} <br/>',
                                  '<b>Date:</b> {CreationDate} <br/>',
@@ -227,7 +239,7 @@ Ext.define('CustomApp', {
     },
     
     _onTestResultLoaded: function(store, data){
-        console.log( "_onTestResultLoaded", store, data );
+        //console.log( "_onTestResultLoaded", store, data );
         var records = [];
         
         Ext.Array.each(data, function(record) {        
@@ -283,7 +295,7 @@ Ext.define('CustomApp', {
             },
             listeners: {
                 itemclick: function( grid, record, item, index ) {
-                    console.log( "item", record, item, index );
+                    //console.log( "item", record, item, index );
                     Ext.Msg.alert('Notes', record.data.Notes );
                 }
             },
@@ -291,8 +303,8 @@ Ext.define('CustomApp', {
                 {
                     text: 'TestCase', dataIndex: 'FormattedID', width: 65,
                     renderer: function(value,style,row_data, row_index){
-                        console.log(style,row_data, row_index);
-                        console.log( Rally.util.Navigation.createReallyDetailUrl );
+                        //console.log(style,row_data, row_index);
+                        //console.log( Rally.util.Navigation.createReallyDetailUrl );
                         return Ext.String.format("<a target='_top' href='/slm/detail/tc/{1}'>{0}</a>", value, row_data.data.ObjectID);
                     }
                 },
@@ -317,16 +329,93 @@ Ext.define('CustomApp', {
     
             ]
         });
+
+        this._showTestChart(store);
+    },
+    _showTestChart: function(store) {
+        var testSets = {};
+
+        store.each(function(testResult){
+            var testSet = testResult.get('TestSet');
+            if (!testSets.hasOwnProperty(testSet.ObjectID)) {
+                testSets[testSet.ObjectID] = {
+                    name: testSet.Name,
+                    failures: 0
+                }
+            }
+
+            if(testResult.get('Verdict') !== "Pass"){
+                testSets[testSet.ObjectID].failures++;
+            }
+        });
+
+        var seriesData = [];
+        for (var testSetId in testSets) {
+            var testSet = testSets[testSetId];
+            seriesData.push({
+                y: testSet.failures,
+                tooltip: testSet.name,
+                color: '#FF0000'
+            });
+        };
+
+        console.log(seriesData);
+
+        var chartContainer = this.down('#test_result_chart');
+        chartContainer.removeAll();
+
+        chartContainer.add({
+          xtype: 'rallychart',
+          height: 400,
+          width: this.down('#build_summary').getWidth() - this.down('#build_results').getWidth(),
+          chartConfig: {
+              chart: {
+                type: 'column'
+              },
+              tooltip: {
+                  formatter: function() {
+                        return this.point.tooltip;
+                    }
+              },
+              legend: {enabled: false},
+              series: [{data: seriesData}],
+              title: {
+                  text: 'Test Failures',
+                  align: 'center'
+              },
+              xAxis: [
+                  {
+                      title: {
+                          text: 'Tests'
+                      },
+                      labels: {
+                          formatter: function() {
+                                return this.tooltip;
+                            }
+                      }
+                  }
+              ],
+              yAxis: {
+                  title: {
+                      text: 'Failed Tests'
+                  },
+                  allowDecimals: false
+              },
+          }
+        });
+
+        //console.log("Passed:", testsPassed);
+        //console.log("Total Results:", store.getCount());
     
     },
     
     _testResults: function(buildId){
-        console.log("Test results for: " + buildId);
+        //console.log("Test results for: " + buildId);
         //Query all TestCaseResults objects in context with Build = buildId
         
         Ext.create('Rally.data.WsapiDataStore', {
                         model: 'TestCaseResult',
-                        fetch: ['ObjectID','Build', 'Duration', 'Verdict', 'TestCase', 'FormattedID', 'Name', 'Notes', 'Date'],
+                        fetch: ['ObjectID','Build', 'Duration', 'Verdict', 'TestCase', 'FormattedID', 'Name', 'Notes', 'Date', 'TestSet'],
                         autoLoad: true,
                         listeners: {
                             load: this._onTestResultLoaded,
@@ -353,7 +442,7 @@ Ext.define('CustomApp', {
             autoLoad: true,
             listeners: {
                 load: function(store) {
-                    console.log(store, arguments);
+                    //console.log(store, arguments);
                     var record = store.getAt(0);
                     this._buildResults(record.getData());
                     this._testResults(record.get('Number'));
