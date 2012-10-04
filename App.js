@@ -341,7 +341,7 @@ Ext.define('CustomApp', {
                 testSets[testSet.ObjectID] = {
                     name: testSet.Name,
                     failures: 0
-                }
+                };
             }
 
             if(testResult.get('Verdict') !== "Pass"){
@@ -357,7 +357,7 @@ Ext.define('CustomApp', {
                 tooltip: testSet.name,
                 color: '#FF0000'
             });
-        };
+        }
 
         console.log(seriesData);
 
@@ -400,7 +400,7 @@ Ext.define('CustomApp', {
                       text: 'Failed Tests'
                   },
                   allowDecimals: false
-              },
+              }
           }
         });
 
