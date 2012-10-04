@@ -56,6 +56,7 @@ Ext.define('CustomApp', {
     launch: function() {
         this._saySomething("Looking for most recent build..." );
         this._getBuild();
+        Rally.environment.getMessageBus().subscribe('buildSelected', this._onBuildSelected, this);
     },
     _saySomething: function( message ) {
         this.down("#message_box").update(message);
@@ -141,7 +142,13 @@ Ext.define('CustomApp', {
             var changeStore = Ext.create('Rally.data.custom.Store', {
                         model: 'ChangeSetModel',
                         pageSize: 5,
-                        data: cs_records
+                        data: cs_records,
+                        listeners: {
+                            load: function() {
+                                this.setLoading(false);
+                            },
+                            scope: this
+                        }
                     });
    
             if ( this.cr_grid ) { this.cr_grid.destroy(); }
@@ -239,9 +246,14 @@ Ext.define('CustomApp', {
         });
         
         this.resultsStore = Ext.create('Rally.data.custom.Store', {
-            model: 'ResultsModel',
             pageSize: 5,
-            data: records
+            data: records,
+            sorters: [
+              {
+                  property: 'Verdict',
+                  direction: 'ASC'
+              }
+            ]
         });
         
         if ( this.tr_grid ) { this.tr_grid.destroy(); }
@@ -304,12 +316,6 @@ Ext.define('CustomApp', {
         Ext.create('Rally.data.WsapiDataStore', {
                         model: 'TestCaseResult',
                         fetch: ['ObjectID','Build', 'Duration', 'Verdict', 'TestCase', 'FormattedID', 'Name', 'Notes', 'Date'],
-                        sorters: [
-                                  {
-                                      property: 'Date',
-                                      direction: 'DESC'
-                                  }
-                        ],
                         autoLoad: true,
                         listeners: {
                             load: this._onTestResultLoaded,
@@ -323,6 +329,34 @@ Ext.define('CustomApp', {
                         ]
                     });
         
+    },
+
+    _onBuildSelected: function(ref) {
+        var buildref = new Rally.util.Ref(ref),
+            oid = buildref.getOid();
+
+        this.setLoading(true);
+        Ext.create('Rally.data.WsapiDataStore', {
+            model: 'Build',
+            fetch: ['Revision','Number','Changesets','Message','Status','CreationDate','Duration','Changes','Base','Extension'],
+            autoLoad: true,
+            listeners: {
+                load: function(store) {
+                    console.log(store, arguments);
+                    var record = store.getAt(0);
+                    this._buildResults(record.getData());
+                    this._testResults(record.get('Number'));
+                },
+                scope: this
+            },
+            filters: [
+                {
+                    property: 'ObjectID', 
+                    operator: "=",
+                    value: oid
+                }
+            ]
+        });
     }
 });
 
