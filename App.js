@@ -349,9 +349,11 @@ Ext.define('CustomApp', {
             }
         });
 
-        var seriesData = [];
+        var seriesData = [],
+            categories = [];
         for (var testSetId in testSets) {
             var testSet = testSets[testSetId];
+            categories.push(testSet.name);
             seriesData.push({
                 y: testSet.failures,
                 tooltip: testSet.name,
@@ -386,13 +388,9 @@ Ext.define('CustomApp', {
               xAxis: [
                   {
                       title: {
-                          text: 'Tests'
+                          text: 'Test Sets'
                       },
-                      labels: {
-                          formatter: function() {
-                                return this.tooltip;
-                            }
-                      }
+                      categories: categories
                   }
               ],
               yAxis: {
