@@ -53,6 +53,7 @@ Ext.define('CustomApp', {
                 ]
             }
     ],
+    buildFetch: ['Revision','Number','Changesets', 'Author', 'DisplayName', 'Message','Status','CreationDate','Duration','Changes','Base','Extension'],
     launch: function() {
         this._saySomething("Looking for most recent build..." );
         this._getBuild();
@@ -66,7 +67,7 @@ Ext.define('CustomApp', {
             model: 'Build',
             autoLoad: true,
             pageSize: 1,
-            fetch: ['Revision','Number','Changesets','Message','Status','CreationDate','Duration','Changes','Base','Extension'],
+            fetch: this.buildFetch,
             sorters: [{
                 property: 'CreationDate',
                 direction: 'DESC'
@@ -118,7 +119,8 @@ Ext.define('CustomApp', {
                 var cs_record = {
                     Revision: record.Revision,
                     Message: record.Message,
-                    ChangeText: record.ChangeText
+                    ChangeText: record.ChangeText,
+                    Author: record.Author
                 };
                 var change_array = [];
                 Ext.Array.each( record.Changes, function(change) {
@@ -133,9 +135,10 @@ Ext.define('CustomApp', {
             Ext.define('ChangeSetModel', {
                 extend: 'Ext.data.Model',
                 fields: [
-                {name: 'Revision', type: 'string'},
-                {name: 'Message', type: 'string'},
-                { name: 'ChangeText', type: 'string' }
+                    {name: 'Revision', type: 'string'},
+                    {name: 'Message', type: 'string'},
+                    {name: 'ChangeText', type: 'string'},
+                    {name: 'Author', type: 'object'}
                 ]        
             });
             
@@ -177,6 +180,15 @@ Ext.define('CustomApp', {
                         text: 'Revision', dataIndex: 'Revision' 
                     },
                     {
+                        text: 'Author', renderer: function(value, metadata, record) {
+                            var author = record.get('Author');
+                            if (author){
+                                return author.DisplayName;
+                            }
+                            return "Fix me"; //my middle name  => linux user id!
+                        }
+                    },
+                    {
                         text: 'Message', dataIndex: 'Message', flex: 1
                     }
                 ]
@@ -184,7 +196,6 @@ Ext.define('CustomApp', {
     },
     
     _changeSets: function(build){        
-        //console.log("Number of changes: ", build.Changesets.length);
         if(build.Changesets !== null){
             console.log('changesets:', build.Changesets);
             this._onChangeSetsLoaded( build.Changesets );
@@ -295,11 +306,11 @@ Ext.define('CustomApp', {
                     text: 'Verdict', dataIndex: 'Verdict', width: 95, 
                     renderer: function(value){
                         if((value === "Fail") || (value === "Error") || (value === "Blocked")){
-                            return Ext.String.format("<div style='background-color:#F00;color:#FFF;font-weight:bold;text-align:center;padding: 3px'>{0}</div>", value);
+                            return Ext.String.format("<div style='background-color:#FF0000;color:#FFF;font-weight:bold;text-align:center;padding: 3px'>{0}</div>", value);
                         } else if ( value === "Inconclusive" ) {
                             return Ext.String.format("<div style='background-color:#ccc;color:#000;font-weight:bold;text-align:center;padding: 3px'>{0}</div>", value);
                         }else{
-                            return Ext.String.format("<div style='background-color:#2EFE2E;color:#000;font-weight:bold;text-align:center;padding: 3px'>{0}</div>", value);
+                            return Ext.String.format("<div style='background-color:#07C600;color:#000;font-weight:bold;text-align:center;padding: 3px'>{0}</div>", value);
                         }
                     }
                 }
@@ -338,7 +349,7 @@ Ext.define('CustomApp', {
         this.setLoading(true);
         Ext.create('Rally.data.WsapiDataStore', {
             model: 'Build',
-            fetch: ['Revision','Number','Changesets','Message','Status','CreationDate','Duration','Changes','Base','Extension'],
+            fetch: this.buildFetch,
             autoLoad: true,
             listeners: {
                 load: function(store) {
