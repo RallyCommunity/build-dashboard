@@ -132,7 +132,8 @@ Ext.define('CustomApp', {
                     Revision: record.Revision,
                     Message: record.Message,
                     ChangeText: record.ChangeText,
-                    Author: record.Author
+                    Author: record.Author,
+                    NumChanges: record.Changes.length
                 };
                 var change_array = [];
                 Ext.Array.each( record.Changes, function(change) {
@@ -150,7 +151,8 @@ Ext.define('CustomApp', {
                     {name: 'Revision', type: 'string'},
                     {name: 'Message', type: 'string'},
                     {name: 'ChangeText', type: 'string'},
-                    {name: 'Author', type: 'object'}
+                    {name: 'Author', type: 'object'},
+                    {name: 'NumChanges', type: 'string'}
                 ]        
             });
             
@@ -201,6 +203,9 @@ Ext.define('CustomApp', {
                         }
                     },
                     {
+                        text: '# of changes', dataIndex: 'NumChanges'
+                    },
+                    {
                         text: 'Message', dataIndex: 'Message', flex: 1
                     }
                 ]
@@ -246,6 +251,7 @@ Ext.define('CustomApp', {
             var item = record.data;
             records.push({
                 FormattedID: item.TestCase.FormattedID,
+                TestSet: item.TestSet,
                 TestName: item.TestCase.Name,
                 ObjectID: item.TestCase.ObjectID,
                 TestDuration: item.Duration,
@@ -260,6 +266,7 @@ Ext.define('CustomApp', {
             fields: [
                 {name: 'ObjectID', type: 'string' },
                 {name: 'FormattedID', type: 'string'},
+                {name: 'TestSet', type: 'object'},
                 {name: 'TestName', type: 'string'},
                 {name: 'TestDuration', type: 'string'},
                 {name: 'Verdict', type: 'string'},
@@ -300,6 +307,14 @@ Ext.define('CustomApp', {
                 }
             },
             columnCfgs: [
+
+                {
+                    text: 'TestSet',
+                    width: 200,
+                    renderer: function(value, meta, record) {
+                        return record.get('TestSet').Name;
+                    }
+                },
                 {
                     text: 'TestCase', dataIndex: 'FormattedID', width: 65,
                     renderer: function(value,style,row_data, row_index){
