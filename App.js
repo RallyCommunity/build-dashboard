@@ -23,8 +23,8 @@ Ext.define('CustomApp', {
                             },
                             margin: 4,
                             items: [
-                                {xtype: 'container', itemId: 'build_results'},
-                                {xtype: 'container', itemId: 'test_result_chart'}
+                                {xtype: 'container', itemId: 'build_results', flex: 0.5},
+                                {xtype: 'container', itemId: 'test_result_chart', flex: 0.5}
                             ]
                          },
                          { 
@@ -383,7 +383,7 @@ Ext.define('CustomApp', {
 
         chartContainer.add({
           xtype: 'rallychart',
-          height: 400,
+          height: this.down('#build_summary').getHeight(),
           width: this.down('#build_summary').getWidth() - this.down('#build_results').getWidth(),
           chartConfig: {
               chart: {
