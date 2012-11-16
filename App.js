@@ -352,15 +352,18 @@ Ext.define('CustomApp', {
 
         store.each(function(testResult){
             var testSet = testResult.get('TestSet');
-            if (!testSets.hasOwnProperty(testSet.ObjectID)) {
-                testSets[testSet.ObjectID] = {
-                    name: testSet.Name,
-                    failures: 0
-                };
-            }
-
-            if(testResult.get('Verdict') !== "Pass"){
-                testSets[testSet.ObjectID].failures++;
+            if (testSet != null | testSet != undefined)
+            {
+                if (!testSets.hasOwnProperty(testSet.ObjectID)) {
+                    testSets[testSet.ObjectID] = {
+                        name: testSet.Name,
+                        failures: 0
+                    };
+                }
+    
+                if(testResult.get('Verdict') !== "Pass"){
+                    testSets[testSet.ObjectID].failures++;
+                }
             }
         });
 
