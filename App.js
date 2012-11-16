@@ -14,7 +14,19 @@ Ext.define('CustomApp', {
                 items: [ { xtype: 'container', itemId: 'message_box', width: 200 }, 
                          { xtype: 'container', itemId: 'button_box', width: 200 },
                          { xtype: 'container', itemId: 'interface_box', cls: "box"},
-                         { xtype: 'container', itemId: 'build_results'},
+                         {
+                            xtype: 'container',
+                            itemId: 'build_summary',
+                            layout: {
+                                type: 'hbox',
+                                align: 'stretch'
+                            },
+                            margin: 4,
+                            items: [
+                                {xtype: 'container', itemId: 'build_results', flex: 0.5},
+                                {xtype: 'container', itemId: 'test_result_chart', flex: 0.5}
+                            ]
+                         },
                          { 
                              xtype: 'container',
                              flex: 1,
@@ -53,9 +65,11 @@ Ext.define('CustomApp', {
                 ]
             }
     ],
+    buildFetch: ['Revision','Number','Changesets', 'Author', 'DisplayName', 'Message','Status','CreationDate','Duration','Changes','Base','Extension'],
     launch: function() {
         this._saySomething("Looking for most recent build..." );
         this._getBuild();
+        Rally.environment.getMessageBus().subscribe('buildSelected', this._onBuildSelected, this);
     },
     _saySomething: function( message ) {
         this.down("#message_box").update(message);
@@ -65,14 +79,14 @@ Ext.define('CustomApp', {
             model: 'Build',
             autoLoad: true,
             pageSize: 1,
-            fetch: ['Revision','Number','Changesets','Message','Status','CreationDate','Duration','Changes','Base','Extension'],
+            fetch: this.buildFetch,
             sorters: [{
                 property: 'CreationDate',
                 direction: 'DESC'
               }],
             listeners: {
                 load: function(store, data){
-                    console.log(data);
+                    //console.log(data);
                     this._buildResults(data[0].data);
                     this._testResults( data[0].data.Number);
                     this._saySomething("" );
@@ -89,7 +103,7 @@ Ext.define('CustomApp', {
                                         buildChosen: {
                                             scope: this,
                                             fn: function( settings ) {
-                                                console.log( "buildChosen:", settings.build );
+                                                //console.log( "buildChosen:", settings.build );
                                                 if ( settings.build && settings.build !== null ) {
                                                     // TODO: is there an easier way to get the grandparent?   
                                                     this.ownerCt.ownerCt.ownerCt._buildResults(settings.build);
@@ -110,14 +124,16 @@ Ext.define('CustomApp', {
         });
     },
     _onChangeSetsLoaded: function(changesets){
-            console.log("_onChangeSetsLoaded: ", changesets);    
+            //console.log("_onChangeSetsLoaded: ", changesets);    
             var cs_records = [];  
             
             Ext.Array.each(changesets, function(record) { 
                 var cs_record = {
                     Revision: record.Revision,
                     Message: record.Message,
-                    ChangeText: record.ChangeText
+                    ChangeText: record.ChangeText,
+                    Author: record.Author,
+                    NumChanges: record.Changes.length
                 };
                 var change_array = [];
                 Ext.Array.each( record.Changes, function(change) {
@@ -132,16 +148,24 @@ Ext.define('CustomApp', {
             Ext.define('ChangeSetModel', {
                 extend: 'Ext.data.Model',
                 fields: [
-                {name: 'Revision', type: 'string'},
-                {name: 'Message', type: 'string'},
-                { name: 'ChangeText', type: 'string' }
+                    {name: 'Revision', type: 'string'},
+                    {name: 'Message', type: 'string'},
+                    {name: 'ChangeText', type: 'string'},
+                    {name: 'Author', type: 'object'},
+                    {name: 'NumChanges', type: 'string'}
                 ]        
             });
             
             var changeStore = Ext.create('Rally.data.custom.Store', {
                         model: 'ChangeSetModel',
                         pageSize: 5,
-                        data: cs_records
+                        data: cs_records,
+                        listeners: {
+                            load: function() {
+                                this.setLoading(false);
+                            },
+                            scope: this
+                        }
                     });
    
             if ( this.cr_grid ) { this.cr_grid.destroy(); }
@@ -170,6 +194,18 @@ Ext.define('CustomApp', {
                         text: 'Revision', dataIndex: 'Revision' 
                     },
                     {
+                        text: 'Author', renderer: function(value, metadata, record) {
+                            var author = record.get('Author');
+                            if (author){
+                                return author.DisplayName;
+                            }
+                            return "Fix me"; //my middle name  => linux user id!
+                        }
+                    },
+                    {
+                        text: '# of changes', dataIndex: 'NumChanges'
+                    },
+                    {
                         text: 'Message', dataIndex: 'Message', flex: 1
                     }
                 ]
@@ -177,17 +213,16 @@ Ext.define('CustomApp', {
     },
     
     _changeSets: function(build){        
-        //console.log("Number of changes: ", build.Changesets.length);
         if(build.Changesets !== null){
-            console.log('changesets:', build.Changesets);
+            //console.log('changesets:', build.Changesets);
             this._onChangeSetsLoaded( build.Changesets );
         }else{
-            console.log("No changesets for build");
+            //console.log("No changesets for build");
         }
     },
     
     _buildResults: function(build){
-        console.log(build);
+        //console.log(build);
         var t = new Ext.Template('<b>Build Number:</b> {Number} <br/>' +
                                  '<b>Build Status:</b> {Status} <br/>',
                                  '<b>Date:</b> {CreationDate} <br/>',
@@ -209,13 +244,14 @@ Ext.define('CustomApp', {
     },
     
     _onTestResultLoaded: function(store, data){
-        console.log( "_onTestResultLoaded", store, data );
+        //console.log( "_onTestResultLoaded", store, data );
         var records = [];
         
         Ext.Array.each(data, function(record) {        
             var item = record.data;
             records.push({
                 FormattedID: item.TestCase.FormattedID,
+                TestSet: item.TestSet,
                 TestName: item.TestCase.Name,
                 ObjectID: item.TestCase.ObjectID,
                 TestDuration: item.Duration,
@@ -230,6 +266,7 @@ Ext.define('CustomApp', {
             fields: [
                 {name: 'ObjectID', type: 'string' },
                 {name: 'FormattedID', type: 'string'},
+                {name: 'TestSet', type: 'object'},
                 {name: 'TestName', type: 'string'},
                 {name: 'TestDuration', type: 'string'},
                 {name: 'Verdict', type: 'string'},
@@ -239,9 +276,14 @@ Ext.define('CustomApp', {
         });
         
         this.resultsStore = Ext.create('Rally.data.custom.Store', {
-            model: 'ResultsModel',
             pageSize: 5,
-            data: records
+            data: records,
+            sorters: [
+              {
+                  property: 'Verdict',
+                  direction: 'ASC'
+              }
+            ]
         });
         
         if ( this.tr_grid ) { this.tr_grid.destroy(); }
@@ -260,16 +302,24 @@ Ext.define('CustomApp', {
             },
             listeners: {
                 itemclick: function( grid, record, item, index ) {
-                    console.log( "item", record, item, index );
+                    //console.log( "item", record, item, index );
                     Ext.Msg.alert('Notes', record.data.Notes );
                 }
             },
             columnCfgs: [
+
+                {
+                    text: 'TestSet',
+                    width: 200,
+                    renderer: function(value, meta, record) {
+                        return record.get('TestSet').Name;
+                    }
+                },
                 {
                     text: 'TestCase', dataIndex: 'FormattedID', width: 65,
                     renderer: function(value,style,row_data, row_index){
-                        console.log(style,row_data, row_index);
-                        console.log( Rally.util.Navigation.createReallyDetailUrl );
+                        //console.log(style,row_data, row_index);
+                        //console.log( Rally.util.Navigation.createReallyDetailUrl );
                         return Ext.String.format("<a target='_top' href='/slm/detail/tc/{1}'>{0}</a>", value, row_data.data.ObjectID);
                     }
                 },
@@ -283,33 +333,102 @@ Ext.define('CustomApp', {
                     text: 'Verdict', dataIndex: 'Verdict', width: 95, 
                     renderer: function(value){
                         if((value === "Fail") || (value === "Error") || (value === "Blocked")){
-                            return Ext.String.format("<div style='background-color:#F00;color:#FFF;font-weight:bold;text-align:center;padding: 3px'>{0}</div>", value);
+                            return Ext.String.format("<div style='background-color:#FF0000;color:#FFF;font-weight:bold;text-align:center;padding: 3px'>{0}</div>", value);
                         } else if ( value === "Inconclusive" ) {
                             return Ext.String.format("<div style='background-color:#ccc;color:#000;font-weight:bold;text-align:center;padding: 3px'>{0}</div>", value);
                         }else{
-                            return Ext.String.format("<div style='background-color:#2EFE2E;color:#000;font-weight:bold;text-align:center;padding: 3px'>{0}</div>", value);
+                            return Ext.String.format("<div style='background-color:#07C600;color:#000;font-weight:bold;text-align:center;padding: 3px'>{0}</div>", value);
                         }
                     }
                 }
     
             ]
         });
+
+        this._showTestChart(store);
+    },
+    _showTestChart: function(store) {
+        var testSets = {};
+
+        store.each(function(testResult){
+            var testSet = testResult.get('TestSet');
+            if (!testSets.hasOwnProperty(testSet.ObjectID)) {
+                testSets[testSet.ObjectID] = {
+                    name: testSet.Name,
+                    failures: 0
+                };
+            }
+
+            if(testResult.get('Verdict') !== "Pass"){
+                testSets[testSet.ObjectID].failures++;
+            }
+        });
+
+        var seriesData = [],
+            categories = [];
+        for (var testSetId in testSets) {
+            var testSet = testSets[testSetId];
+            categories.push(testSet.name);
+            seriesData.push({
+                y: testSet.failures,
+                tooltip: testSet.name,
+                color: '#FF0000'
+            });
+        }
+
+        console.log(seriesData);
+
+        var chartContainer = this.down('#test_result_chart');
+        chartContainer.removeAll();
+
+        chartContainer.add({
+          xtype: 'rallychart',
+          height: this.down('#build_summary').getHeight(),
+          width: this.down('#build_summary').getWidth() - this.down('#build_results').getWidth(),
+          chartConfig: {
+              chart: {
+                type: 'column'
+              },
+              tooltip: {
+                  formatter: function() {
+                        return this.point.tooltip;
+                    }
+              },
+              legend: {enabled: false},
+              series: [{data: seriesData}],
+              title: {
+                  text: 'Test Failures',
+                  align: 'center'
+              },
+              xAxis: [
+                  {
+                      title: {
+                          text: 'Test Sets'
+                      },
+                      categories: categories
+                  }
+              ],
+              yAxis: {
+                  title: {
+                      text: 'Failed Tests'
+                  },
+                  allowDecimals: false
+              }
+          }
+        });
+
+        //console.log("Passed:", testsPassed);
+        //console.log("Total Results:", store.getCount());
     
     },
     
     _testResults: function(buildId){
-        console.log("Test results for: " + buildId);
+        //console.log("Test results for: " + buildId);
         //Query all TestCaseResults objects in context with Build = buildId
         
         Ext.create('Rally.data.WsapiDataStore', {
                         model: 'TestCaseResult',
-                        fetch: ['ObjectID','Build', 'Duration', 'Verdict', 'TestCase', 'FormattedID', 'Name', 'Notes', 'Date'],
-                        sorters: [
-                                  {
-                                      property: 'Date',
-                                      direction: 'DESC'
-                                  }
-                        ],
+                        fetch: ['ObjectID','Build', 'Duration', 'Verdict', 'TestCase', 'FormattedID', 'Name', 'Notes', 'Date', 'TestSet'],
                         autoLoad: true,
                         listeners: {
                             load: this._onTestResultLoaded,
@@ -323,6 +442,34 @@ Ext.define('CustomApp', {
                         ]
                     });
         
+    },
+
+    _onBuildSelected: function(ref) {
+        var buildref = new Rally.util.Ref(ref),
+            oid = buildref.getOid();
+
+        this.setLoading(true);
+        Ext.create('Rally.data.WsapiDataStore', {
+            model: 'Build',
+            fetch: this.buildFetch,
+            autoLoad: true,
+            listeners: {
+                load: function(store) {
+                    //console.log(store, arguments);
+                    var record = store.getAt(0);
+                    this._buildResults(record.getData());
+                    this._testResults(record.get('Number'));
+                },
+                scope: this
+            },
+            filters: [
+                {
+                    property: 'ObjectID', 
+                    operator: "=",
+                    value: oid
+                }
+            ]
+        });
     }
 });
 
