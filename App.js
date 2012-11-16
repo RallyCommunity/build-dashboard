@@ -352,7 +352,7 @@ Ext.define('CustomApp', {
 
         store.each(function(testResult){
             var testSet = testResult.get('TestSet');
-            if (testSet != null | testSet != undefined)
+            if (testSet != null || testSet != undefined)
             {
                 if (!testSets.hasOwnProperty(testSet.ObjectID)) {
                     testSets[testSet.ObjectID] = {
